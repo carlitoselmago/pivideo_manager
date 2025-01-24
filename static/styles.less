@@ -1,0 +1,61 @@
+@action: blue;
+
+html{
+    background-color: gainsboro;
+    font-family: "Nunito Sans", serif;
+    
+    body{
+        padding: 20px;
+    }
+
+    h1{
+        font-weight: 100;
+        margin-top: 0px;
+    }
+    .buttons{
+
+    }
+    .actions{
+        button{
+            border-radius: 999999px;
+            background-color: blue;
+            border: none;
+            color: white;
+            padding: 8px 20px;
+            cursor:pointer;
+            &.alert{
+                background-color: red;
+            }
+        }
+    }
+
+    .devices{
+        margin-top: 20px;
+        .device{
+            background-color: white;
+            border-radius: 999999px;
+            display: flex;
+            .f{
+                padding: 2px 20px;
+                padding-top: 10px;
+                display: flex;
+                flex-direction: column;
+                .l{
+                    font-size: 9px;
+                }
+                .value{
+                    margin-top: -4px;
+                }
+
+                &.f_name{
+                    min-width: 200px;
+                }
+                
+            }
+            .actions{
+                padding: 7px;
+                margin-left: auto;
+            }
+        }
+    }
+}

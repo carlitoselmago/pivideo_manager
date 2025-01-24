@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pivideo Device Manager</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,200..1000&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet/less" type="text/css" href="{{url_for('static', filename='styles.less')}}" />
+    <script src="{{url_for('static', filename='less.js')}}"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>pivideo manager : {{ setup.name }}</h1>
+
+    <div class="buttons actions">
+        <button id="scan-btn" iprange="{{ setup.iprange }}"">Scan Network</button>
+    </div>
+   
+    <div class="devices" id="device-table">
+      
+        {% for device in devices %}
+        <div class="device" data-ip="{{ device.ip }}">
+            <div class="f f_name">
+                <span class="l">NAME</span>
+                <div contenteditable="true" class="editable-name value">{{ device.name }}</div>
+            </div>
+
+            <div class="f">
+                <span class="l">IP</span>
+                <div class="value">{{ device.ip }}</div>
+            </div>
+
+            <div class="f">
+                <span class="l">MAC</span>
+                <div class="value">{{ device.mac }}</div>
+            </div>
+
+            <div class="f">
+                <span class="l">TEMPERATURE</span>
+                <div class="value">{{ device.temperature if device.temperature else 'N/A' }}</div>
+            </div>
+
+            <div class="f">
+                <span class="l">RAM</span>
+                <div class="value">{{ device.ram if device.ram else 'N/A' }}</div>
+            </div>
+
+            <div class="f">
+                <span class="l">STORAGE</span>
+                <div class="value">{{ device.storage if device.storage else 'N/A' }}</div>
+            </div>
+
+            <div class="f">
+                <span class="l">LAG</span>
+                <div class="value">{{ device.lag if device.lag else 'N/A' }}</div>
+            </div>
+
+            <div class="f">
+                <span class="l">MASTER</span>
+                <input type="checkbox" class="editable-master" {% if device.master %}checked{% endif %}>
+            </div>
+
+            <div class="f">
+                <span class="l">LAST CONNECTION</span>
+                {{ device.last_connection | default("Never") | datetimeformat }}
+            </div>
+            <div class="actions">
+                <button class="info-btn ">SHOW ON SCREEN</button>
+                <button class="info-btn">GATHER INFO</button>
+               
+                <button class="delete-btn alert">X</button>
+            </div>
+            
+        </div>
+        {% endfor %}
+        
+    </div>
+
+    <script src="{{url_for('static', filename='script.js')}}"></script>
+   
+</body>
+</html>

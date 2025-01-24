@@ -2,8 +2,8 @@
 Raspberry video player manager
 
 # Usage
-run with sudo
+
 
 ```
-sudo python main.py
+python GUI.py
 ```
