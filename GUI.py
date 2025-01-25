@@ -20,10 +20,13 @@ manager = PiVideoManager("Gofre","192.168.100.0/24")
 @app.route('/')
 def home():
     """Home page showing device list."""
-    devices = manager.get_all_devices()
-    setup = manager.get_setup()
-    print("setup",setup)
-    return render_template('index.html', devices=devices,setup=setup[0])
+    
+    setups = manager.get_setups()
+    for setup in setups:
+        print("setup",setup)
+        setup["devices"] = manager.get_all_devices_in_iprange(setup["iprange"])
+    
+    return render_template('index.html', setups=setups)
 
 @app.route('/api/devices', methods=['GET'])
 def get_devices():
@@ -96,20 +99,38 @@ def update_device():
 @app.route('/api/device_info/<ip>', methods=['GET'])
 def get_device_info(ip):
     """API endpoint to fetch detailed information of a specific device."""
-    device = manager.get_device_by_ip(ip)
+    device_info = manager.update_client(ip)
+    device = render_template('partials/device.html', device=device_info)
     if device:
-        return jsonify(device)
+        return device
     return jsonify({"error": "Device not found"}), 404
 
-@app.route('/api/device_metrics/<ip>', methods=['GET'])
-def get_device_metrics(ip):
-    """API endpoint to fetch metrics (temperature, RAM, storage, lag) of a device."""
-    client = manager.connect_to_device(ip)
-    if client:
-        info = manager.get_device_info(client)
-        client.close()
-        return jsonify(info)
-    return jsonify({"error": "Failed to connect to device"}), 400
+@app.route('/api/show_screen/<ip>', methods=['GET'])
+def show_screen_info(ip):
+    """API endpoint to make a device show info on screeen."""
+    device_info = manager.update_client(ip)
+    manager.show_txt_message_on_screen(ip,device_info["name"]+" "+device_info["ip"])
+    return jsonify({"message": "Action sent successfully."})
+
+@app.route('/api/reboot/<ip>', methods=['GET'])
+def reboot_device(ip):
+    """API endpoint to make a device reboot."""
+  
+    manager.reboot_device(ip)
+    return jsonify({"message": "Action sent successfully."})
+
+@app.route('/api/playback/<ip>/<action>', methods=['GET'])
+def playback_control(ip,action):
+    """API endpoint to make a control playback."""
+    manager.playback_control(ip,action)
+    return jsonify({"message": "Action sent successfully."})
+
+@app.route('/api/playbackall/<iprange>/<action>', methods=['GET'])
+def playbackall_control(iprange,action):
+    """API endpoint to make a control playback."""
+    manager.playbackall_control(iprange.replace("_","/"),action)
+    return jsonify({"message": "Action sent successfully."})
+
 
 if __name__ == '__main__':
     app.run(debug=True)

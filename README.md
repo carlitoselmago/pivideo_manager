@@ -5,5 +5,5 @@ Raspberry video player manager
 
 
 ```
-python GUI.py
+sudo python GUI.py
 ```

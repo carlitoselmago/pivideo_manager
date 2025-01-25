@@ -6,6 +6,7 @@ import subprocess
 import sqlite3
 from datetime import datetime
 import concurrent.futures
+import threading
 
 class PiVideoManager:
 
@@ -28,6 +29,7 @@ class PiVideoManager:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS devices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                iprange TEXT,
                 name TEXT UNIQUE,
                 ip TEXT UNIQUE,
                 model TEXT,
@@ -62,26 +64,44 @@ class PiVideoManager:
         conn.commit()
         conn.close()
 
-    def add_device(self, name, ip, model, mac, master=False):
-        """Add a new device to the database in the scan process."""
+    def save_device(self, info,iprange=""):
+        """Add or update a device in the database based on the MAC address."""
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
-        cursor.execute('''
-            INSERT OR IGNORE INTO devices (name, ip,  mac, master, last_connection)
-            VALUES (?, ?,  ?, ?, ?)
-        ''', (name, ip,  mac, master, None))
+
+        # Check if the device with the given MAC address exists
+        cursor.execute("SELECT COUNT(*) FROM devices WHERE mac = ?", (info.get("mac"),))
+        exists = cursor.fetchone()[0] > 0
+
+        if exists:
+            # If the device exists, update its values
+            update_fields = ', '.join(f"{key} = ?" for key in info if key != "mac")
+            values = [info[key] for key in info if key != "mac"]
+            values.append(info["mac"])  # Add mac for WHERE clause
+
+            cursor.execute(f"UPDATE devices SET {update_fields} WHERE mac = ?", values)
+            print(f"Device with MAC {info['mac']} updated successfully.")
+        else:
+            info["iprange"]=iprange
+            # If the device does not exist, insert it
+            columns = ', '.join(info.keys())
+            placeholders = ', '.join(['?' for _ in info])
+            values = list(info.values())
+
+            cursor.execute(f"INSERT INTO devices ({columns}) VALUES ({placeholders})", values)
+            print(f"Device {info.get('name', 'Unknown')} added successfully.")
+
         conn.commit()
         conn.close()
-        print(f"Device {name} added successfully.")
 
-    def update_device_info(self, ip, model, temperature, ram, storage, lag):
+    def update_device_info(self, ip, info):
         """Update the collected device info in the database."""
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE devices SET model = ?, temperature = ?, ram = ?, storage = ?, lag = ?, last_connection = ?
             WHERE ip = ?
-        ''', (model, temperature, ram, storage, lag, datetime.now().isoformat(), ip))
+        ''', (info["model"], temperature, ram, storage, lag, datetime.now().isoformat(), ip))
         conn.commit()
         conn.close()
 
@@ -98,16 +118,16 @@ class PiVideoManager:
         conn.close()
 
 
-    def get_setup(self):
+    def get_setups(self):
         """Retrieve setup."""
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT *
             FROM setup
-            LIMIT 1 
+            
         ''')
-        setup = cursor.fetchall()
+        setups = cursor.fetchall()
         conn.close()
         
         # Format the device data
@@ -120,56 +140,46 @@ class PiVideoManager:
                 "last_update": d[4],
                 
             }
-            for d in setup
+            for d in setups
         ]
 
-    def get_all_devices(self):
-        """Retrieve all devices from the database."""
+    def get_device_by_mac(self,mac):
         conn = sqlite3.connect(self.db_file)
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT name, ip, mac, temperature, ram, storage, lag, master, sort, last_connection
-            FROM devices ORDER BY sort
-        ''')
+        cursor.execute('SELECT * FROM devices WHERE mac = ?', (mac,)) 
+        device = cursor.fetchone()
+        conn.close()
+        return dict(device)
+
+    def get_master_ip(self, ip):
+        conn = sqlite3.connect(self.db_file)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Query to find a master device with a matching IP
+        cursor.execute("SELECT ip FROM devices WHERE master = 1 AND ip LIKE ?", (ip[:ip.rfind('.') + 1] + '%',))
+        device = cursor.fetchone()
+        conn.close()
+        
+        return device['ip'] if device else None
+
+ 
+
+    def get_all_devices_in_iprange(self,iprange):
+        """Retrieve all devices from the database and return as a list of dictionaries."""
+        conn = sqlite3.connect(self.db_file)
+        conn.row_factory = sqlite3.Row  # Enables dictionary-like access
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM devices WHERE iprange = ? ORDER BY sort", (iprange,))
         devices = cursor.fetchall()
         conn.close()
         
-        # Format the device data
-        return [
-            {
-                "name": d[0],
-                "ip": d[1],
-                "mac": d[2],
-                "temperature": d[3],
-                "ram": d[4],
-                "storage": d[5],
-                "lag": d[6],
-                "master": bool(d[7]),
-                "sort": d[8],
-                "last_connection": d[9] if d[9] else "Never"
-            }
-            for d in devices
-        ]
+        # Convert rows to dictionaries
+        return [dict(device) for device in devices]
 
-
-    def get_device_info(self, client):
-        """Retrieve device details using SSH."""
-        try:
-            commands = {
-                "mac": "cat /sys/class/net/eth0/address",
-                "temperature": "vcgencmd measure_temp | cut -d'=' -f2",
-                "ram": "free -m | awk '/^Mem:/ {print $2 \" MB\"}'",
-                "storage": "df -h / | awk 'NR==2 {print $3 \"/\" $2 \" used\"}'"
-            }
-            results = {}
-            for key, command in commands.items():
-                stdin, stdout, stderr = client.exec_command(command)
-                results[key] = stdout.read().decode().strip()
-
-            return results
-        except Exception as e:
-            return {"error": str(e)}
-
+ 
     def get_ping_lag(self, target_ip):
         """Ping the master device to measure lag."""
         try:
@@ -195,9 +205,11 @@ class PiVideoManager:
                 print(f"Device found at: {ip}")
                 client = self.connect_to_device(ip)
                 if client:
-                    info = self.get_device_info(client)
-                    mac = info.get("mac", "Unknown")
-                    self.add_device(f"Device_{mac.replace(':', '_')}", ip, mac)
+                    print (f"Client found at {ip}")
+                    
+                    info = self.collect_device_info(ip,client)
+                    
+                    self.save_device(info,ip_range)
                     client.close()
 
         try:
@@ -212,22 +224,120 @@ class PiVideoManager:
         except ValueError:
             print("Invalid IP range format. Please use CIDR notation (e.g., 192.168.1.0/24).")
 
-    def collect_device_info(self,mac):
+    def collect_device_info(self,ip,client):
         """Retrieve and store information for all connected devices."""
-        """
-          {
-                "IP": self.devices[next(index for index, d in enumerate(self.devices) if d["name"] == name)]["ip"],
-                "Model": self.get_raspi_model(client),
-                "RAM": self.get_ram_size(client),
-                "MAC_Address": self.get_mac_address(client),
-                "net_lag": self.get_lag(client),
-                "Temperature": self.get_temperature(client)
-                
+        
+        info = {
+                "ip": ip,
+                "model": self.get_raspi_model(client),
+                "mac": self.get_mac_address(client),
+                "ram": self.get_ram_size(client),
+                "lag": self.get_lag(client,ip),
+                "storage": self.get_storage(client),
+                "temperature": self.get_temperature(client),
+                "last_connection":datetime.now().isoformat()
             }
-        """
-          
-            
+        
+        #self.update_device_info(ip,info)
         print("Device information collected.")
+        return info
+    
+    def get_device_by_ip(self, ip):
+        client = self.connect_to_device(ip)
+        return self.collect_device_info(ip,client)
+    
+    def update_client(self,ip):
+        client = self.connect_to_device(ip)
+        info = self.collect_device_info(ip,client)
+        self.save_device(info)
+        #now get the whole data from db
+        info_extended = self.get_device_by_mac(info["mac"])
+        print("info_extended",info_extended)
+        client.close()
+        return info_extended
+
+    def get_mac_address(self, client):
+        """Retrieve the MAC address of the Raspberry Pi."""
+        try:
+            stdin, stdout, stderr = client.exec_command("cat /sys/class/net/eth0/address")
+            return stdout.read().decode().strip() or "Unknown MAC"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def get_temperature(self, client):
+        """Retrieve the CPU temperature from the Raspberry Pi."""
+        try:
+            stdin, stdout, stderr = client.exec_command("vcgencmd measure_temp")
+            output = stdout.read().decode().strip()
+            return output.split('=')[1] if output else "Unknown"
+        except Exception as e:
+            return f"Error: {e}"
+        
+    def get_storage(self, client):
+        """Retrieve the used and remaining storage from the Raspberry Pi."""
+        try:
+            # Execute the `df` command to check disk usage on the root filesystem
+            stdin, stdout, stderr = client.exec_command("df -h / | tail -n 1")
+            output = stdout.read().decode().strip()
+
+            if output:
+                parts = output.split()
+                total_storage = parts[1]  # Total size of the filesystem
+                used_storage = parts[2]   # Used space
+                available_storage = parts[3]  # Available space
+                return "T:"+total_storage+" / R:"+available_storage
+                """
+                return {
+                    "total": total_storage,
+                    "used": used_storage,
+                    "remaining": available_storage
+                }
+                """
+            else:
+                return {"error": "No output received"}
+        except Exception as e:
+            return {"error": str(e)}
+
+
+    def get_raspi_model(self, client):
+        """Retrieve the Raspberry Pi model."""
+        try:
+            stdin, stdout, stderr = client.exec_command("cat /proc/device-tree/model")
+            return stdout.read().decode().strip() or "Unknown model"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def get_ram_size(self, client):
+        """Retrieve the total RAM size in MB."""
+        try:
+            stdin, stdout, stderr = client.exec_command("free -m | awk '/^Mem:/ {print $2}'")
+            return f"{stdout.read().decode().strip()} MB" if stdout else "Unknown RAM"
+        except Exception as e:
+            return f"Error: {e}"
+
+    def get_mac_address(self, client):
+        """Retrieve the MAC address of the Raspberry Pi."""
+        try:
+            stdin, stdout, stderr = client.exec_command("cat /sys/class/net/eth0/address")
+            return stdout.read().decode().strip() or "Unknown MAC"
+        except Exception as e:
+            return f"Error: {e}"
+    
+    def get_lag(self, client,ip):
+        """Retrieve the lag using ping to the master player."""
+        try:
+            # Send a single ping request with a 1-second timeout
+            stdin, stdout, stderr = client.exec_command(f"ping -c 1 -W 1 {self.get_master_ip(ip)}")
+            output = stdout.read().decode().strip()
+
+            # Extract the ping time from the output
+            if "time=" in output:
+                lag = output.split("time=")[-1].split(" ")[0]
+                return f"{round(float(lag),2)} ms"
+            else:
+                return "Ping failed or no response"
+        except Exception as e:
+            return f"no master detected {e}"#f"Error: {e}"
 
     def connect_to_device(self, ip):
         """Establish an SSH connection to a device."""
@@ -257,6 +367,157 @@ class PiVideoManager:
         conn.commit()
         conn.close()
         print(f"Device {ip} set as master.")
+
+    def show_txt_message_on_screen(self, ip, msg):
+        """
+        Shows the provided message on the screen of all connected devices using ffmpeg and omxplayer.
+        """
+        print("Executing show message on",ip,"msg:",msg)
+        client = self.connect_to_device(ip)
+        self.kill_omxplayer(ip)
+        # Construct the ffmpeg command
+        escaped_msg = msg.replace(':', r'\:').replace('\n', r'\\ ')
+
+        seconds = 5
+        #command = (
+        #    f'ffmpeg -y -f lavfi -i "color=c=black:s=1280x720,drawtext=fontfile=/usr/share/fonts/FreeSans.ttf:fontsize=48:text=\'{escaped_msg}\':fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2\" -t 1 -c:v libx264 -pix_fmt yuv420p msg.mp4 && omxplayer msg.mp4 --layer 2 --loop {seconds}'
+        #)
+        command = (
+            f'ffmpeg -y -f lavfi -i color=black:s=320x240 \
+        -vf "drawtext=text=\'{escaped_msg}\':fontcolor=white:fontsize=24:x=(w-text_w)/2:y=(h-text_h)/2" \
+        -t 5 -r 1 -c:v libx264 -preset ultrafast -crf 35 -pix_fmt yuv420p msg.mp4 && omxplayer -b --no-osd msg.mp4 --layer 3'
+        )
+        print(command)
+        # Execute the command on the device
+        try:
+            stdin, stdout, stderr = client.exec_command(command)
+            
+            # Wait for the command to complete
+            while not stdout.channel.exit_status_ready():
+                time.sleep(1)
+
+            exit_status = stdout.channel.recv_exit_status()  # Blocks until command is done
+            
+            if exit_status == 0:
+                print("Message displayed successfully.")
+            else:
+                error_msg = stderr.read().decode()
+                print(f"Error showing message: {error_msg}")
+            return True
+
+        except Exception as e:
+            print(f"Error showing message: {e}")
+        
+    def reboot_device(self,ip):
+        client = self.connect_to_device(ip)
+        command = ('sudo reboot')
+        try:
+            stdin, stdout, stderr = client.exec_command(command)
+            
+            # Wait for the command to complete
+            while not stdout.channel.exit_status_ready():
+                time.sleep(1)
+
+            exit_status = stdout.channel.recv_exit_status()  # Blocks until command is done
+            
+            if exit_status == 0:
+                print("Device reboot message sent.")
+            else:
+                error_msg = stderr.read().decode()
+                print(f"Error trying to reboot: {error_msg}")
+            return True
+        except Exception as e:
+            print(f"Error trying to reboot: {e}")
+
+    def kill_omxplayer(self,ip):
+        client = self.connect_to_device(ip)
+        command = ('sudo pkill -f omxplayer')
+        try:
+            stdin, stdout, stderr = client.exec_command(command)
+            
+            # Wait for the command to complete
+            while not stdout.channel.exit_status_ready():
+                time.sleep(1)
+
+            exit_status = stdout.channel.recv_exit_status()  # Blocks until command is done
+            
+            if exit_status == 0:
+                print("Device reboot message sent.")
+            else:
+                error_msg = stderr.read().decode()
+                print(f"Error trying to reboot: {error_msg}")
+            return True
+        except Exception as e:
+            print(f"Error trying to reboot: {e}")
+
+    def execute_remote_command(self,ip, command, wait_for_output=True):
+        try:
+            client = self.connect_to_device(ip)
+            
+            stdin, stdout, stderr = client.exec_command(command)
+            
+            if wait_for_output:
+                # Wait for the command to complete
+                while not stdout.channel.exit_status_ready():
+                    time.sleep(1)
+                
+                exit_status = stdout.channel.recv_exit_status()  # Blocks until command is done
+                output = stdout.read().decode()
+                error = stderr.read().decode()
+                
+                if exit_status == 0:
+                    print(f"Command executed successfully on {ip}: {output}")
+                    return True
+                else:
+                    print(f"Error executing command on {ip}: {error}")
+                    return False
+            
+            print(f"Command sent to {ip}, not waiting for output.")
+            return True
+            
+        except Exception as e:
+            print(f"Error connecting to {ip}: {e}")
+            return False
+        finally:
+            client.close()
+
+    ## Playback functions
+    def playback_control(self,ip,command="pause"):
+        if command=="pause":
+            run="sudo -E bash -c 'export DBUS_SESSION_BUS_ADDRESS=$(cat /tmp/omxplayerdbus.${USER:-root}) && dbus-send --print-reply=literal --session --dest=org.mpris.MediaPlayer2.omxplayer /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Action int32:16 >/dev/null'"
+        if command=="mute":
+            run = "sudo -E bash -c 'export DBUS_SESSION_BUS_ADDRESS=$(cat /tmp/omxplayerdbus.${USER:-root}) && dbus-send --print-reply=literal --session --dest=org.mpris.MediaPlayer2.omxplayer /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Set string:\"org.mpris.MediaPlayer2.Player\" string:\"Volume\" variant:double:0.0 >/dev/null'"
+        if command=="unmute":
+            run = "sudo -E bash -c 'export DBUS_SESSION_BUS_ADDRESS=$(cat /tmp/omxplayerdbus.${USER:-root}) && dbus-send --print-reply=literal --session --dest=org.mpris.MediaPlayer2.omxplayer /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Set string:\"org.mpris.MediaPlayer2.Player\" string:\"Volume\" variant:double:1.0 >/dev/null'"
+    
+        print("playback_control",ip,command)
+        self.execute_remote_command(ip,run,wait_for_output=True)
+        return True
+    
+    def playbackall_control(self, iprange, command="pause"):
+        # Get devices in iprange
+        devices = self.get_all_devices_in_iprange(iprange)
+        
+        # Define a helper function for threading
+        def control_device(ip):
+            self.playback_control(ip, command)
+
+        threads = []
+
+        # Create and start a thread for each device
+        for d in devices:
+            thread = threading.Thread(target=control_device, args=(d["ip"],))
+            thread.start()
+            threads.append(thread)
+
+        # Wait for all threads to complete
+        for thread in threads:
+            thread.join()
+
+        return True
+
+
+    ## end playback functions
 
     def close_connections(self):
         """Close all SSH connections."""

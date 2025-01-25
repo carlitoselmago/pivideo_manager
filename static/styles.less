@@ -1,7 +1,85 @@
-@action: blue;
+@action: #fc4817;
+@bg: #1a1d21;
+@pagetitle: #f0f0f0;
+@elementbg: #40464f;
+@elementtitle:white;
+@elementtitle_bg:#363a40;
+
+.hidden{
+    display: none;
+}
+.updating{
+    opacity: 0.4;
+    pointer-events: none;
+    cursor: wait;
+}
+.fields{
+    display: flex;
+    flex-wrap: wrap;
+    .f{
+        padding: 2px 20px;
+        padding-top: 10px;
+        display: flex;
+        flex-direction: column;
+        .l{
+            font-size: 9px;
+        }
+        .value{
+            margin-top: -4px;
+        }
+    
+        &.f_name{
+            min-width: 200px;
+        }
+        
+    }
+}
+.playbackactions{
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        margin-right: 5px;
+    button.playback-btn{
+        border-radius: 0px;
+        margin-left: 0px;
+        margin-right: 0px;
+        border-right: solid 1px white;
+        &:first-of-type{
+            border-radius: 999999px 0px 0px 999999px;
+        }
+        &:last-of-type{
+            border-radius: 0px   999999px 999999px 0px;
+        }
+    }
+}
+.actions{
+    padding: 7px;
+    margin-left: auto;
+    button{
+        font-size: 10px;
+        padding: 2px 10px;
+        border-radius: 8px;
+    }
+}
+.setup{
+    border: solid 1px transparent;
+    border-radius: 20px;
+    padding: 20px;
+    padding-top: 0px;
+    background-color: @elementbg;
+    .setuptitle{
+        font-weight: normal;
+        background-color: @elementtitle_bg;
+        color:@elementtitle;
+        border-radius: 999999px;
+        padding: 8px 1px;
+      
+        display: flex;
+    }
+}
 
 html{
-    background-color: gainsboro;
+    background-color: @bg;
     font-family: "Nunito Sans", serif;
     
     body{
@@ -11,20 +89,35 @@ html{
     h1{
         font-weight: 100;
         margin-top: 0px;
+        color:@pagetitle;
     }
     .buttons{
 
     }
     .actions{
+        display: flex;
         button{
             border-radius: 999999px;
-            background-color: blue;
+            background-color: @action;
             border: none;
             color: white;
-            padding: 8px 20px;
+            padding: 8px 12px;
             cursor:pointer;
+            margin: 2px;
+            border-radius: 0px;
+            margin-left: 0px;
+            margin-right: 0px;
+            border-right: solid 1px white;
             &.alert{
-                background-color: red;
+                background-color: black;
+                color:white;
+            }
+            &:first-of-type{
+                border-radius: 999999px 0px 0px 999999px;
+            }
+            &:last-of-type{
+                border-radius: 0px   999999px 999999px 0px;
+                border-right: none;
             }
         }
     }
@@ -33,29 +126,12 @@ html{
         margin-top: 20px;
         .device{
             background-color: white;
-            border-radius: 999999px;
+            border-radius: 20px;
             display: flex;
-            .f{
-                padding: 2px 20px;
-                padding-top: 10px;
-                display: flex;
-                flex-direction: column;
-                .l{
-                    font-size: 9px;
-                }
-                .value{
-                    margin-top: -4px;
-                }
-
-                &.f_name{
-                    min-width: 200px;
-                }
-                
-            }
-            .actions{
-                padding: 7px;
-                margin-left: auto;
-            }
+           
+            margin: 10px 0px;
+            
+            
         }
     }
 }
