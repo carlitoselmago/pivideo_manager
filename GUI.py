@@ -15,7 +15,7 @@ def datetimeformat(value, format="%Y-%m-%d %H:%M:%S"):
             return value  # If parsing fails, return original value
     return "Never"
 
-manager = PiVideoManager("Gofre","192.168.100.0/24")
+manager = PiVideoManager()
 
 @app.route('/')
 def home():
@@ -28,12 +28,13 @@ def home():
     
     return render_template('index.html', setups=setups)
 
+"""
 @app.route('/api/devices', methods=['GET'])
 def get_devices():
-    """API endpoint to get all devices."""
-    devices = manager.get_all_devices()
+    #API endpoint to get all devices.
+    devices = manager.get_all_devices_in_iprange()
     return jsonify(devices)
-
+"""
 @app.route('/api/add_device', methods=['POST'])
 def add_device():
     """API endpoint to add a new device."""
@@ -76,9 +77,10 @@ def delete_device():
 @app.route('/api/scan', methods=['POST'])
 def scan_network():
     """API endpoint to trigger IP scan."""
-    ip_range = request.json.get('ip_range', '192.168.100.0/24')
+    ip_range = request.json.get('ip_range')
+    
     manager.scan_ip_range(ip_range)
-    return jsonify({"message": "Scan completed.", "devices": manager.get_all_devices()})
+    return jsonify({"message": "Scan completed."})
 
 @app.route('/api/update_device', methods=['POST'])
 def update_device():
@@ -96,21 +98,23 @@ def update_device():
     return jsonify({"message": "Device updated successfully."})
 
 
-@app.route('/api/device_info/<ip>', methods=['GET'])
-def get_device_info(ip):
+@app.route('/api/device_info/<ip>/<mac>', methods=['GET'])
+def get_device_info(ip,mac):
     """API endpoint to fetch detailed information of a specific device."""
-    device_info = manager.update_client(ip)
+    device_info = manager.update_client(ip,mac)
     device = render_template('partials/device.html', device=device_info)
     if device:
         return device
     return jsonify({"error": "Device not found"}), 404
 
-@app.route('/api/show_screen/<ip>', methods=['GET'])
-def show_screen_info(ip):
+@app.route('/api/show_screen/<ip>/<mac>', methods=['GET'])
+def show_screen_info(ip,mac):
     """API endpoint to make a device show info on screeen."""
-    device_info = manager.update_client(ip)
-    manager.show_txt_message_on_screen(ip,device_info["name"]+" "+device_info["ip"])
-    return jsonify({"message": "Action sent successfully."})
+    device_info = manager.update_client(ip,mac)
+    if device_info:
+        manager.show_txt_message_on_screen(ip,device_info["name"]+" "+device_info["ip"])
+        return jsonify({"message": "Action sent successfully."})
+    return jsonify({"message": "Coult not connect to device."})
 
 @app.route('/api/reboot/<ip>', methods=['GET'])
 def reboot_device(ip):
@@ -130,6 +134,41 @@ def playbackall_control(iprange,action):
     """API endpoint to make a control playback."""
     manager.playbackall_control(iprange.replace("_","/"),action)
     return jsonify({"message": "Action sent successfully."})
+
+@app.route('/api/add_setup', methods=['POST'])
+def add_setup():
+    data = request.get_json()
+    name = data.get('name')
+    iprange = data.get('iprange')
+
+    if not name or not iprange:
+        return jsonify({'status': 'error', 'message': 'All fields are required'}), 400
+
+    # Store setup (in real-world, save to a database)
+    if manager.create_setup(name,iprange):
+        return jsonify({'status': 'success', 'message': 'Setup added successfully!', 'setup': {"name":name,"iprange":iprange}})
+    else:
+        return jsonify({"error": "iprange already exists or bad iprange"})
+
+@app.route('/api/update_device_order', methods=['POST'])
+def update_device_order():
+    try:
+        order_data = request.get_json()
+        print("order_data",order_data)
+
+        manager.sort_devices(order_data)
+        """
+        for item in order_data:
+            mac = item['mac']
+            order = item['order']
+            container_id = item['container_id']
+
+            # Update order in the database (replace with actual DB logic)
+            
+        """
+        return jsonify({'status': 'success', 'message': 'Order updated successfully'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
 
 
 if __name__ == '__main__':

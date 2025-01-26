@@ -11,10 +11,36 @@
 
     <link rel="stylesheet/less" type="text/css" href="{{url_for('static', filename='styles.less')}}" />
     <script src="{{url_for('static', filename='less.js')}}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
     <h1>pivideo manager</h1>
+
+    <div class="actions">
+        <button id="openPopup" class="singlebtn">Add Setup</button>
+    </div>
+
+    <div id="popupForm" class="popup-overlay">
+        <div class="popup">
+            <h2>Add New Setup</h2>
+            <form id="setupForm" action="" method="POST">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" required>
+                <br>
+                <label for="iprange">IP Range</label>
+                <input type="text" id="iprange" name="iprange" required>
+                <br>
+                <div class="actions">
+                   
+                    <button type="button" id="closePopup" class="singlebtn lessimportant">Cancel</button>
+                    <button type="submit" class="singlebtn">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
     {% for setup in setups %}
         {% include 'partials/setup.html' %}
     {% endfor %}

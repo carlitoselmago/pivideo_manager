@@ -14,13 +14,13 @@ class PiVideoManager:
     password = "raspberry"
     db_file = "devices.db"
 
-    def __init__(self,setupname,iprange):
+    def __init__(self):
         """Initialize the PiVideoManager and setup the database."""
         self.connections = {}
         self.device_info = {}
-        self.setup_database(setupname,iprange)
+        self.setup_database()
 
-    def setup_database(self,setupname,iprange):
+    def setup_database(self):
         """Create the necessary database tables if they do not exist."""
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
@@ -39,6 +39,7 @@ class PiVideoManager:
                 storage TEXT,
                 lag TEXT,
                 master BOOLEAN DEFAULT FALSE,
+                missing BOOLEAN DEFAULT FALSE,
                 sort INTEGER DEFAULT 0,
                 last_connection TEXT
             )
@@ -54,27 +55,51 @@ class PiVideoManager:
                 last_update TEXT
             )
         ''')
-
+        """
         # Insert default setup if not exists
         cursor.execute('SELECT COUNT(*) FROM setup')
         if cursor.fetchone()[0] == 0:
             cursor.execute('INSERT INTO setup (name, iprange, creation_date, last_update) VALUES (?, ?, ?, ?)',
                            (setupname, iprange, datetime.now().isoformat(), datetime.now().isoformat()))
-
+        """
         conn.commit()
         conn.close()
+    
+    def create_setup(self, name, iprange):
+        # Validate CIDR notation
+        try:
+            ipaddress.ip_network(iprange, strict=False)  # Allow both network and host IPs
+        except ValueError:
+            return False  # Invalid CIDR format
+
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT COUNT(*) FROM setup WHERE iprange = ?', (iprange,))
+        if cursor.fetchone()[0] == 0:
+            cursor.execute(
+                'INSERT INTO setup (name, iprange, creation_date, last_update) VALUES (?, ?, ?, ?)',
+                (name, iprange, datetime.now().isoformat(), datetime.now().isoformat())
+            )
+            conn.commit()
+            conn.close()
+            return True  # Successfully added to the database
+
+        conn.close()
+        return False  # Entry already exists
 
     def save_device(self, info,iprange=""):
         """Add or update a device in the database based on the MAC address."""
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
-
+        print("gonna save device",iprange,info)
         # Check if the device with the given MAC address exists
         cursor.execute("SELECT COUNT(*) FROM devices WHERE mac = ?", (info.get("mac"),))
         exists = cursor.fetchone()[0] > 0
-
+        
         if exists:
             # If the device exists, update its values
+            info["missing"] = False
             update_fields = ', '.join(f"{key} = ?" for key in info if key != "mac")
             values = [info[key] for key in info if key != "mac"]
             values.append(info["mac"])  # Add mac for WHERE clause
@@ -194,22 +219,37 @@ class PiVideoManager:
             return "N/A"
 
     def scan_ip_range(self, ip_range, max_threads=50):
-        """Scans the given IP range and adds discovered devices to the database, avoiding .1, .245, and .255 IPs."""
-        print("ip range",ip_range)
+        """Scans the given IP range, updates preexisting devices in the database,
+        and identifies missing devices by their MAC addresses."""
+
+        # Retrieve current devices in the given IP range from the database
+        db_devices = self.get_all_devices_in_iprange(ip_range)
+
+        # Extract MAC addresses from the database devices
+        db_mac_set = {device['mac'] for device in db_devices}  # Set of MAC addresses in the DB
+
+        scanned_macs = set()  # Track discovered MACs during the scan
+
         def ping_ip(ip):
             """Helper function to ping an IP and return status."""
             ping_cmd = ["ping", "-c", "1", "-W", "1"] if platform.system().lower() != "windows" else ["ping", "-n", "1", "-w", "1000"]
             command = ping_cmd + [ip]
             result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            
             if result.returncode == 0:
                 print(f"Device found at: {ip}")
                 client = self.connect_to_device(ip)
                 if client:
-                    print (f"Client found at {ip}")
+                    print(f"Client connected at {ip}")
                     
-                    info = self.collect_device_info(ip,client)
+                    # Collect device information including MAC address
+                    info = self.collect_device_info(ip, client)
+                    #print("info of found device",info)
+                    # Add the MAC address to the scanned list
+                    if 'mac' in info:
+                        scanned_macs.add(info['mac'])
                     
-                    self.save_device(info,ip_range)
+                    self.save_device(info, ip_range)
                     client.close()
 
         try:
@@ -221,8 +261,26 @@ class PiVideoManager:
             with concurrent.futures.ThreadPoolExecutor(max_threads) as executor:
                 executor.map(ping_ip, ip_list)
 
+            # After scanning, identify missing devices by their MAC addresses
+            missing_devices = db_mac_set - scanned_macs
+
+            if missing_devices:
+                print(f"Devices missing from the scan (MACs): {missing_devices}")
+                self.handle_missing_devices(missing_devices)
+
         except ValueError:
             print("Invalid IP range format. Please use CIDR notation (e.g., 192.168.1.0/24).")
+
+
+    def handle_missing_devices(self,devices):
+        """It gets a list of mac adresses to flag as missing in the db"""
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+        for mac in devices:
+          
+            cursor.execute('UPDATE devices SET missing = ? WHERE mac = ?', (True, mac))
+        conn.commit()
+        conn.close()
 
     def collect_device_info(self,ip,client):
         """Retrieve and store information for all connected devices."""
@@ -246,15 +304,26 @@ class PiVideoManager:
         client = self.connect_to_device(ip)
         return self.collect_device_info(ip,client)
     
-    def update_client(self,ip):
+    def update_client(self,ip,mac):
         client = self.connect_to_device(ip)
-        info = self.collect_device_info(ip,client)
-        self.save_device(info)
-        #now get the whole data from db
-        info_extended = self.get_device_by_mac(info["mac"])
-        print("info_extended",info_extended)
-        client.close()
+        if client:
+            info = self.collect_device_info(ip,client)
+            self.save_device(info)
+            #now get the whole data from db
+            info_extended = self.get_device_by_mac(mac)
+            print("info_extended",info_extended)
+            client.close()
+        else:
+            #client is missing, update and return DB values
+            self.handle_missing_devices([mac])
+            info_extended = self.get_device_by_mac(mac)
         return info_extended
+
+    def sort_devices(self,devices_order):
+        for device in devices_order:
+            mac = device["mac"]
+            sort = device["order"]
+            self.update_device_order(mac,sort)
 
     def get_mac_address(self, client):
         """Retrieve the MAC address of the Raspberry Pi."""
@@ -355,6 +424,14 @@ class PiVideoManager:
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
         cursor.execute('UPDATE devices SET last_connection = ? WHERE mac = ?', (datetime.now().isoformat(), mac))
+        conn.commit()
+        conn.close()
+    
+    def update_device_order(self, mac,sort):
+        """Update sort for a device."""
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+        cursor.execute('UPDATE devices SET sort = ? WHERE mac = ?', (sort, mac))
         conn.commit()
         conn.close()
 
@@ -479,7 +556,8 @@ class PiVideoManager:
             print(f"Error connecting to {ip}: {e}")
             return False
         finally:
-            client.close()
+            if client:
+                client.close()
 
     ## Playback functions
     def playback_control(self,ip,command="pause"):

@@ -1,9 +1,10 @@
 $(document).ready(function () {
     // Handle scanning network with AJAX
     $("body").on("click",'.scan-btn',function () {
-        var ip_range = $(this).data('iprange');  // Get the data attribute value
+        var ip_range = $(this).attr('iprange');  // Get the data attribute value
         var setupElement = $(this).closest(".setup");
         setupElement.addClass("updating");
+        
         $.ajax({
             url: '/api/scan',
             type: 'POST',
@@ -24,9 +25,9 @@ $(document).ready(function () {
         var deviceElement = $(this).closest(".device");
         deviceElement.addClass("updating")
         var ip = deviceElement.attr("data-ip");  // Get the data attribute value
-        
+        var mac = deviceElement.attr("data-mac");
         $.ajax({
-            url: '/api/device_info/'+ip,
+            url: '/api/device_info/'+ip+'/'+mac,
             type: 'GET',
             contentType: 'application/json',
             success: function (response) {
@@ -49,9 +50,9 @@ $(document).ready(function () {
         var deviceElement = $(this).closest(".device");
         buttonelement.addClass("updating")
         var ip = deviceElement.attr("data-ip");  // Get the data attribute value
-        
+        var mac = deviceElement.attr("data-mac");
         $.ajax({
-            url: '/api/show_screen/'+ip,
+            url: '/api/show_screen/'+ip+'/'+mac,
             type: 'GET',
             contentType: 'application/json',
             success: function (response) {
@@ -178,4 +179,73 @@ $(document).ready(function () {
             }
         });
     });
+
+    $('#openPopup').click(function() {
+        $('#popupForm').fadeIn();
+    });
+    $('#closePopup').click(function() {
+        $('#popupForm').fadeOut();
+    });
+
+    $('#setupForm').submit(function(event) {
+        event.preventDefault();  // Prevent default form submission
+
+        let formData = {
+            name: $('#name').val(),
+            iprange: $('#iprange').val()
+        };
+
+        $.ajax({
+            url: '/api/add_setup',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                alert(response.message);
+                $('#popupForm').fadeOut();
+                $('#setupForm')[0].reset();
+                location.reload();  // Refresh to reflect the new setup
+            },
+            error: function(xhr) {
+                alert('Error: ' + xhr.responseJSON.message);
+            }
+        });
+    });
+
+
+    document.querySelectorAll('.devices').forEach((deviceContainer) => {
+        new Sortable(deviceContainer, {
+            handle: '.dragarea',  // Allow dragging only by dragarea
+            animation: 150,       // Smooth animation
+            onEnd: function (evt) {
+                let sortedDevices = [];
+                
+                // Iterate over the sorted items within this container only
+                deviceContainer.querySelectorAll('.device').forEach((device, index) => {
+                    sortedDevices.push({
+                        mac: device.getAttribute('data-mac'),
+                        order: index + 1,
+                        container_id: deviceContainer.id  // Identify which sortable container
+                    });
+                });
+
+                console.log(sortedDevices);  // Capture new order in console
+
+                // Send sorted order to the server via AJAX
+                $.ajax({
+                    url: '/api/update_device_order',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(sortedDevices),
+                    success: function(response) {
+                        console.log('Order updated successfully:', response);
+                    },
+                    error: function(xhr) {
+                        console.error('Error updating order:', xhr.responseText);
+                    }
+                });
+            }
+        });
+    });
+
 });
