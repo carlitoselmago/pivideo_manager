@@ -18,6 +18,7 @@ class PiVideoManager:
         """Initialize the PiVideoManager and setup the database."""
         self.connections = {}
         self.device_info = {}
+        
         self.setup_database()
 
     def setup_database(self):
@@ -55,13 +56,34 @@ class PiVideoManager:
                 last_update TEXT
             )
         ''')
-        """
-        # Insert default setup if not exists
-        cursor.execute('SELECT COUNT(*) FROM setup')
-        if cursor.fetchone()[0] == 0:
-            cursor.execute('INSERT INTO setup (name, iprange, creation_date, last_update) VALUES (?, ?, ?, ?)',
-                           (setupname, iprange, datetime.now().isoformat(), datetime.now().isoformat()))
-        """
+
+        # Check if admin table exists
+        cursor.execute("""
+            SELECT count(*) 
+            FROM sqlite_master 
+            WHERE type='table' AND name='users'
+        """)
+        table_exists = cursor.fetchone()[0]
+
+        if not table_exists:
+            # Create admin table if it doesn't exist
+            cursor.execute('''
+                CREATE TABLE users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user TEXT UNIQUE,
+                    password TEXT,
+                    setup TEXT
+                )
+            ''')
+            
+            user = input("Set an admin user: ")
+            password = input("Set an admin password: ")
+
+            # Insert admin credentials
+            cursor.execute('''
+                INSERT INTO admin (user, password) VALUES (?, ?)
+            ''', (user, password))
+        
         conn.commit()
         conn.close()
     
