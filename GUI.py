@@ -2,8 +2,10 @@ from flask import Flask, jsonify, request, render_template, session, redirect, u
 from functools import wraps
 from pivideo_manager import PiVideoManager
 from datetime import datetime
+import os
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'default_fallback_key')
 
 # Define a custom filter to format timestamps
 @app.template_filter('datetimeformat')
@@ -22,13 +24,22 @@ manager = PiVideoManager()
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'admin_logged_in' not in session or not session['admin_logged_in']:
+        if 'role' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if session['role'] != "admin":
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
 @app.route('/')
 @login_required
+@admin_required
 def home():
     """Home page showing device list."""
     
@@ -39,6 +50,11 @@ def home():
     
     return render_template('index.html', setups=setups)
 
+@app.route('/control/<friendlyurl>')
+@login_required
+def home_lite(friendlyurl):
+    return "home lite for "+friendlyurl
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Admin login page."""
@@ -48,11 +64,17 @@ def login():
 
         # Verify admin credentials
         userrole = manager.check_login(username,password)
-
+        print("userrole",userrole)
         if userrole:
-            session['user_logged_in'] = True
-            session['user'] = username
-            return redirect(url_for('home'))
+            if userrole == "admin":
+                session['role'] = userrole
+                session["username"] = username
+                return redirect(url_for('home'))
+            if userrole !="":
+                session['role'] = userrole
+                session["username"] = username
+                return redirect(url_for('home_lite'))
+            
         else:
             return render_template('login.html', error="Invalid username or password")
     return render_template('login.html')
@@ -182,13 +204,14 @@ def add_setup():
     data = request.get_json()
     name = data.get('name')
     iprange = data.get('iprange')
+    password = data.get('password')
 
     if not name or not iprange:
         return jsonify({'status': 'error', 'message': 'All fields are required'}), 400
 
     # Store setup (in real-world, save to a database)
-    if manager.create_setup(name,iprange):
-        return jsonify({'status': 'success', 'message': 'Setup added successfully!', 'setup': {"name":name,"iprange":iprange}})
+    if manager.create_setup(name,iprange,password):
+        return jsonify({'status': 'success', 'message': 'Setup added successfully!', 'setup': {"name":name,"iprange":iprange,"password":password}})
     else:
         return jsonify({"error": "iprange already exists or bad iprange"})
 

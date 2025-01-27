@@ -7,12 +7,14 @@ import sqlite3
 from datetime import datetime
 import concurrent.futures
 import threading
+import unicodedata
+import re
 
 class PiVideoManager:
 
     username = "pi"
     password = "raspberry"
-    db_file = "devices.db"
+    db_file = "data.db"
 
     def __init__(self):
         """Initialize the PiVideoManager and setup the database."""
@@ -51,6 +53,7 @@ class PiVideoManager:
             CREATE TABLE IF NOT EXISTS setup (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT,
+                friendlyurl TEXT,
                 iprange TEXT,
                 creation_date TEXT,
                 last_update TEXT
@@ -81,13 +84,53 @@ class PiVideoManager:
 
             # Insert admin credentials
             cursor.execute('''
-                INSERT INTO admin (user, password) VALUES (?, ?)
-            ''', (user, password))
+                INSERT INTO users (user, password, setup) VALUES (?, ?,?)
+            ''', (user, password,"admin"))
         
         conn.commit()
         conn.close()
-    
-    def create_setup(self, name, iprange):
+
+    def generate_friendly_url(self,text):
+        """
+        Converts a given string into a friendly URL format.
+        
+        Parameters:
+            text (str): The input text to be converted.
+
+        Returns:
+            str: A friendly URL string.
+        """
+        # Normalize the text to remove accents and special characters
+        text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8')
+
+        # Replace non-alphanumeric characters with hyphens
+        text = re.sub(r'[^a-zA-Z0-9]+', '-', text)
+
+        # Remove leading and trailing hyphens
+        text = text.strip('-')
+
+        # Convert to lowercase
+        text = text.lower()
+
+        return text
+
+    def check_login(self,username,password):
+        conn = sqlite3.connect(self.db_file)
+        conn.row_factory = sqlite3.Row  # Enables dictionary-like access
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM users WHERE user = ? AND password = ?', (username, password))
+        user = cursor.fetchone()
+        conn.close()
+        if user:
+            if user["setup"]:
+                return user["setup"]
+            else:
+                return False
+        else:
+            return False
+        
+    def create_setup(self, name, iprange, password):
+        print("create_setup password",password)
         # Validate CIDR notation
         try:
             ipaddress.ip_network(iprange, strict=False)  # Allow both network and host IPs
@@ -97,11 +140,18 @@ class PiVideoManager:
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
 
+        friendlyname = self.generate_friendly_url(name)
+
         cursor.execute('SELECT COUNT(*) FROM setup WHERE iprange = ?', (iprange,))
         if cursor.fetchone()[0] == 0:
             cursor.execute(
-                'INSERT INTO setup (name, iprange, creation_date, last_update) VALUES (?, ?, ?, ?)',
-                (name, iprange, datetime.now().isoformat(), datetime.now().isoformat())
+                'INSERT INTO setup (name, iprange, friendlyurl, creation_date, last_update) VALUES (?, ?, ?, ?,?)',
+                (name, iprange, friendlyname, datetime.now().isoformat(), datetime.now().isoformat())
+            )
+
+            cursor.execute(
+                'INSERT INTO users (user, password, setup) VALUES (?, ?, ?)',
+                (friendlyname, password,friendlyname)
             )
             conn.commit()
             conn.close()
@@ -182,9 +232,10 @@ class PiVideoManager:
             {
                 "id": d[0],
                 "name": d[1],
-                "iprange": d[2],
-                "creation_date": d[3],
-                "last_update": d[4],
+                "friendlyurl": d[2],
+                "iprange": d[3],
+                "creation_date": d[4],
+                "last_update": d[5],
                 
             }
             for d in setups
@@ -241,7 +292,6 @@ class PiVideoManager:
             return "N/A"
 
     def scan_ip_range(self, ip_range, max_threads=50):
-        print("start scan on",ip_range)
         """Scans the given IP range, updates preexisting devices in the database,
         and identifies missing devices by their MAC addresses."""
 

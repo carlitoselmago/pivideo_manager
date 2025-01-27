@@ -189,10 +189,11 @@ $(document).ready(function () {
 
     $('#setupForm').submit(function(event) {
         event.preventDefault();  // Prevent default form submission
-
+        alert($('#password').val())
         let formData = {
             name: $('#name').val(),
-            iprange: $('#iprange').val()
+            iprange: $('#iprange').val(),
+            password: $('#password').val()
         };
 
         $.ajax({
