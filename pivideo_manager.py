@@ -219,6 +219,7 @@ class PiVideoManager:
             return "N/A"
 
     def scan_ip_range(self, ip_range, max_threads=50):
+        print("start scan on",ip_range)
         """Scans the given IP range, updates preexisting devices in the database,
         and identifies missing devices by their MAC addresses."""
 

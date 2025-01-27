@@ -112,7 +112,10 @@ def show_screen_info(ip,mac):
     """API endpoint to make a device show info on screeen."""
     device_info = manager.update_client(ip,mac)
     if device_info:
-        manager.show_txt_message_on_screen(ip,device_info["name"]+" "+device_info["ip"])
+        name="None"
+        if device_info["name"]:
+            name=device_info["name"]
+        manager.show_txt_message_on_screen(ip,name+" "+device_info["ip"])
         return jsonify({"message": "Action sent successfully."})
     return jsonify({"message": "Coult not connect to device."})
 
