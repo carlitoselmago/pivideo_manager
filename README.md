@@ -13,3 +13,5 @@ You can control remotely via vpn a video installation from home (vpn settings no
 ```
 sudo python GUI.py
 ```
+
+and access via http://localhost:5000/pimanager

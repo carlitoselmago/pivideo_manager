@@ -37,7 +37,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-@app.route('/')
+@app.route('/pimanager')
 @login_required
 @admin_required
 def home():
@@ -50,9 +50,7 @@ def home():
     
     return render_template('index.html', setups=setups)
 
-@app.route('/pimanager')
-def test():
-    return "ok"
+
 
 @app.route('/control/<friendlyurl>')
 @login_required
