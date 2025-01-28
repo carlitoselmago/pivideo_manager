@@ -1,4 +1,7 @@
 $(document).ready(function () {
+
+    let homeurl=$("body").attr("homeurl")+"/";
+
     // Handle scanning network with AJAX
     $("body").on("click",'.scan-btn',function () {
         var ip_range = $(this).attr('iprange');  // Get the data attribute value
@@ -6,7 +9,7 @@ $(document).ready(function () {
         setupElement.addClass("updating");
         
         $.ajax({
-            url: '/api/scan',
+            url: homeurl+'/api/scan',
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify({ ip_range: ip_range }),
@@ -27,7 +30,7 @@ $(document).ready(function () {
         var ip = deviceElement.attr("data-ip");  // Get the data attribute value
         var mac = deviceElement.attr("data-mac");
         $.ajax({
-            url: '/api/device_info/'+ip+'/'+mac,
+            url: homeurl+'/api/device_info/'+ip+'/'+mac,
             type: 'GET',
             contentType: 'application/json',
             success: function (response) {
@@ -52,7 +55,7 @@ $(document).ready(function () {
         var ip = deviceElement.attr("data-ip");  // Get the data attribute value
         var mac = deviceElement.attr("data-mac");
         $.ajax({
-            url: '/api/show_screen/'+ip+'/'+mac,
+            url: homeurl+'/api/show_screen/'+ip+'/'+mac,
             type: 'GET',
             contentType: 'application/json',
             success: function (response) {
@@ -75,7 +78,7 @@ $(document).ready(function () {
         var ip = deviceElement.attr("data-ip");  // Get the data attribute value
         
         $.ajax({
-            url: '/api/reboot/'+ip,
+            url: homeurl+'/api/reboot/'+ip,
             type: 'GET',
             contentType: 'application/json',
             success: function (response) {
@@ -103,7 +106,7 @@ $(document).ready(function () {
         }
 
         $.ajax({
-            url: '/api/playback/'+ip+'/'+action,
+            url: homeurl+'/api/playback/'+ip+'/'+action,
             type: 'GET',
             contentType: 'application/json',
             success: function (response) {
@@ -127,7 +130,7 @@ $(document).ready(function () {
         }
 
         $.ajax({
-            url: '/api/playbackall/'+iprange.replace("/", '_')+'/'+action,
+            url: homeurl+'/api/playbackall/'+iprange.replace("/", '_')+'/'+action,
             type: 'GET',
             contentType: 'application/json',
             success: function (response) {
@@ -148,7 +151,7 @@ $(document).ready(function () {
         let master = row.find('.editable-master').is(':checked');
 
         $.ajax({
-            url: '/api/update_device',
+            url: homeurl+'/api/update_device',
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify({ ip: ip, name: newName, master: master }),
@@ -169,7 +172,7 @@ $(document).ready(function () {
         let master = $(this).is(':checked');
 
         $.ajax({
-            url: '/api/update_device',
+            url: homeurl+'/api/update_device',
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify({ ip: ip, name: newName, master: master }),
@@ -199,7 +202,7 @@ $(document).ready(function () {
         };
 
         $.ajax({
-            url: '/api/add_setup',
+            url: homeurl+'api/add_setup',
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify(formData),
@@ -236,7 +239,7 @@ $(document).ready(function () {
 
                 // Send sorted order to the server via AJAX
                 $.ajax({
-                    url: '/api/update_device_order',
+                    url: homeurl+'/api/update_device_order',
                     type: 'POST',
                     contentType: 'application/json',
                     data: JSON.stringify(sortedDevices),
