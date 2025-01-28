@@ -8,7 +8,7 @@
     <link rel="stylesheet/less" type="text/css" href="{{url_for('static', filename='styles.less')}}" />
     <script src="{{url_for('static', filename='less.js')}}"></script>
 </head>
-<body>
+<body homeurl="{{homeurl}}">
     <h1>Admin Login</h1>
     <form method="POST" class="loginform" action="{{ url_for('login') }}">
         <label for="username">Username:</label>

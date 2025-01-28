@@ -1,6 +1,6 @@
 $(document).ready(function () {
 
-    let homeurl=$("body").attr("homeurl")+"/";
+    let homeurl=$("body").attr("homeurl");
 
     // Handle scanning network with AJAX
     $("body").on("click",'.scan-btn',function () {
@@ -202,7 +202,7 @@ $(document).ready(function () {
         };
 
         $.ajax({
-            url: homeurl+'api/add_setup',
+            url: homeurl+'/api/add_setup',
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify(formData),
