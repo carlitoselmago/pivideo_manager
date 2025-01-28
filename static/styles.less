@@ -62,7 +62,7 @@
 .actions{
     padding: 7px;
     margin-left: auto;
-    button{
+    button,.button{
         font-size: 10px;
         padding: 2px 10px;
         border-radius: 8px;
@@ -113,7 +113,10 @@ form{
         display: flex;
     }
 }
-
+header{
+    display: flex; 
+    align-items: center;
+}
 html{
     background-color: @bg;
     font-family: "Nunito Sans", serif;
@@ -132,7 +135,7 @@ html{
     }
     .actions{
         display: flex;
-        button{
+        button,.button{
             border-radius: 999999px;
             background-color: @action;
             border: none;
@@ -144,6 +147,7 @@ html{
             margin-left: 0px;
             margin-right: 0px;
             border-right: solid 1px white;
+            text-decoration: none;
             &.alert{
                 background-color: black;
                 color:white;
@@ -199,6 +203,34 @@ html{
         }
         button{
             margin-left: 5px;
+        }
+    }
+}
+
+.loginform{
+    label{
+        color:white
+    }
+}
+#logoutbtn{
+    margin-left: auto;
+}
+.liteactions{
+    display: flex;
+        border: solid 1px white;
+        border-radius: 20px;
+        height: 100%;
+        flex: 1;
+        min-height: 80vh;
+        justify-content: center;
+        align-items: center;
+        .actions{
+            margin-left: 0px;
+        }
+    button{
+        svg{
+            width: 90px;
+            height: 90px;
         }
     }
 }

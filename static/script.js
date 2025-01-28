@@ -131,7 +131,9 @@ $(document).ready(function () {
             type: 'GET',
             contentType: 'application/json',
             success: function (response) {
-                buttonelement.removeClass("updating");
+                setTimeout(() => {
+                    buttonelement.removeClass("updating");
+                }, 3*1000);
             },
             error: function (xhr) {
                 alert("error on playbackcontrol: " + xhr.responseText);
@@ -189,7 +191,7 @@ $(document).ready(function () {
 
     $('#setupForm').submit(function(event) {
         event.preventDefault();  // Prevent default form submission
-        alert($('#password').val())
+       
         let formData = {
             name: $('#name').val(),
             iprange: $('#iprange').val(),

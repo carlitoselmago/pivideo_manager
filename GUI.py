@@ -53,7 +53,11 @@ def home():
 @app.route('/control/<friendlyurl>')
 @login_required
 def home_lite(friendlyurl):
-    return "home lite for "+friendlyurl
+    # shows a lite control version for few actions over the setup
+    setup = manager.get_setup_by_friendlyurl(friendlyurl)
+    print(setup)
+    return render_template('setuplite.html', setup=setup)
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -73,7 +77,7 @@ def login():
             if userrole !="":
                 session['role'] = userrole
                 session["username"] = username
-                return redirect(url_for('home_lite'))
+                return redirect(url_for('home_lite',friendlyurl=username))
             
         else:
             return render_template('login.html', error="Invalid username or password")

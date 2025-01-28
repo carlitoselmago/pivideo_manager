@@ -241,6 +241,26 @@ class PiVideoManager:
             for d in setups
         ]
 
+    def get_setup_by_friendlyurl(self,friendlyurl):
+        """Retrieve setup."""
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM setup WHERE friendlyurl = ?', (friendlyurl,)) 
+        d = cursor.fetchone()
+        conn.close()
+        
+        # Format the device data
+        return {
+                "id": d[0],
+                "name": d[1],
+                "friendlyurl": d[2],
+                "iprange": d[3],
+                "creation_date": d[4],
+                "last_update": d[5] 
+            }
+      
+
+
     def get_device_by_mac(self,mac):
         conn = sqlite3.connect(self.db_file)
         conn.row_factory = sqlite3.Row
