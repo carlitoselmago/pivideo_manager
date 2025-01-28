@@ -50,6 +50,10 @@ def home():
     
     return render_template('index.html', setups=setups)
 
+@app.route('/pimanager')
+def test():
+    return "ok"
+
 @app.route('/control/<friendlyurl>')
 @login_required
 def home_lite(friendlyurl):
