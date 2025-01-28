@@ -4,10 +4,12 @@ from pivideo_manager import PiVideoManager
 from datetime import datetime
 import os
 
-app = Flask(__name__)
+homeurl="/pimanager"
+
+app = Flask(__name__,static_url_path=homeurl+'/static')
 app.secret_key = os.environ.get('SECRET_KEY', 'default_fallback_key')
 
-homeurl="/pimanager"
+
 
 # Define a custom filter to format timestamps
 @app.template_filter('datetimeformat')
