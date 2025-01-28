@@ -7,6 +7,8 @@ import os
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'default_fallback_key')
 
+homeurl="/pimanager"
+
 # Define a custom filter to format timestamps
 @app.template_filter('datetimeformat')
 def datetimeformat(value, format="%Y-%m-%d %H:%M:%S"):
@@ -37,7 +39,11 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-@app.route('/pimanager')
+@app.route("/")
+def roothome():
+    return redirect(url_for('home'))
+
+@app.route(homeurl)
 @login_required
 @admin_required
 def home():
@@ -48,20 +54,20 @@ def home():
         print("setup",setup)
         setup["devices"] = manager.get_all_devices_in_iprange(setup["iprange"])
     
-    return render_template('index.html', setups=setups)
+    return render_template('index.html', setups=setups,homeurl=homeurl)
 
 
 
-@app.route('/control/<friendlyurl>')
+@app.route(homeurl+'/control/<friendlyurl>')
 @login_required
 def home_lite(friendlyurl):
     # shows a lite control version for few actions over the setup
     setup = manager.get_setup_by_friendlyurl(friendlyurl)
     print(setup)
-    return render_template('setuplite.html', setup=setup)
+    return render_template('setuplite.html', setup=setup,homeurl=homeurl)
 
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route(homeurl+'/login', methods=['GET', 'POST'])
 def login():
     """Admin login page."""
     if request.method == 'POST':
@@ -85,13 +91,13 @@ def login():
             return render_template('login.html', error="Invalid username or password")
     return render_template('login.html')
 
-@app.route('/logout')
+@app.route(homeurl+'/logout')
 def logout():
     """Admin logout."""
     session.clear()
     return redirect(url_for('login'))
 
-@app.route('/api/add_device', methods=['POST'])
+@app.route(homeurl+'/api/add_device', methods=['POST'])
 @login_required
 def add_device():
     """API endpoint to add a new device."""
@@ -107,7 +113,7 @@ def add_device():
     manager.add_device(name, ip, mac, master)
     return jsonify({"message": "Device added successfully!"})
 
-@app.route('/api/set_master', methods=['POST'])
+@app.route(homeurl+'/api/set_master', methods=['POST'])
 @login_required
 def set_master():
     """API endpoint to set a master device."""
@@ -120,7 +126,7 @@ def set_master():
     manager.set_master_device(ip)
     return jsonify({"message": f"Master device set to {ip}."})
 
-@app.route('/api/delete_device', methods=['DELETE'])
+@app.route(homeurl+'/api/delete_device', methods=['DELETE'])
 @login_required
 def delete_device():
     """API endpoint to delete a device."""
@@ -133,7 +139,7 @@ def delete_device():
     manager.delete_device(ip)
     return jsonify({"message": f"Device {ip} deleted."})
 
-@app.route('/api/scan', methods=['POST'])
+@app.route(homeurl+'/api/scan', methods=['POST'])
 @login_required
 def scan_network():
     """API endpoint to trigger IP scan."""
@@ -142,7 +148,7 @@ def scan_network():
     manager.scan_ip_range(ip_range)
     return jsonify({"message": "Scan completed."})
 
-@app.route('/api/update_device', methods=['POST'])
+@app.route(homeurl+'/api/update_device', methods=['POST'])
 @login_required
 def update_device():
     """API endpoint to update device fields like name and master status."""
@@ -159,7 +165,7 @@ def update_device():
     return jsonify({"message": "Device updated successfully."})
 
 
-@app.route('/api/device_info/<ip>/<mac>', methods=['GET'])
+@app.route(homeurl+'/api/device_info/<ip>/<mac>', methods=['GET'])
 @login_required
 def get_device_info(ip,mac):
     """API endpoint to fetch detailed information of a specific device."""
@@ -169,7 +175,7 @@ def get_device_info(ip,mac):
         return device
     return jsonify({"error": "Device not found"}), 404
 
-@app.route('/api/show_screen/<ip>/<mac>', methods=['GET'])
+@app.route(homeurl+'/api/show_screen/<ip>/<mac>', methods=['GET'])
 @login_required
 def show_screen_info(ip,mac):
     """API endpoint to make a device show info on screeen."""
@@ -182,7 +188,7 @@ def show_screen_info(ip,mac):
         return jsonify({"message": "Action sent successfully."})
     return jsonify({"message": "Coult not connect to device."})
 
-@app.route('/api/reboot/<ip>', methods=['GET'])
+@app.route(homeurl+'/api/reboot/<ip>', methods=['GET'])
 @login_required
 def reboot_device(ip):
     """API endpoint to make a device reboot."""
@@ -190,21 +196,21 @@ def reboot_device(ip):
     manager.reboot_device(ip)
     return jsonify({"message": "Action sent successfully."})
 
-@app.route('/api/playback/<ip>/<action>', methods=['GET'])
+@app.route(homeurl+'/api/playback/<ip>/<action>', methods=['GET'])
 @login_required
 def playback_control(ip,action):
     """API endpoint to make a control playback."""
     manager.playback_control(ip,action)
     return jsonify({"message": "Action sent successfully."})
 
-@app.route('/api/playbackall/<iprange>/<action>', methods=['GET'])
+@app.route(homeurl+'/api/playbackall/<iprange>/<action>', methods=['GET'])
 @login_required
 def playbackall_control(iprange,action):
     """API endpoint to make a control playback."""
     manager.playbackall_control(iprange.replace("_","/"),action)
     return jsonify({"message": "Action sent successfully."})
 
-@app.route('/api/add_setup', methods=['POST'])
+@app.route(homeurl+'/api/add_setup', methods=['POST'])
 @login_required
 def add_setup():
     data = request.get_json()
@@ -221,7 +227,7 @@ def add_setup():
     else:
         return jsonify({"error": "iprange already exists or bad iprange"})
 
-@app.route('/api/update_device_order', methods=['POST'])
+@app.route(homeurl+'/api/update_device_order', methods=['POST'])
 @login_required
 def update_device_order():
     try:
@@ -244,4 +250,4 @@ def update_device_order():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000,debug=True)
