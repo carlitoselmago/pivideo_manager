@@ -303,7 +303,11 @@ class PiVideoManager:
         conn.row_factory = sqlite3.Row  # Enables dictionary-like access
         cursor = conn.cursor()
 
-        cursor.execute("SELECT * FROM devices WHERE name = ? ORDER BY sort", (name,))
+        # First get the iprange of the setup
+        cursor.execute("SELECT * FROM setup WHERE name = ?", (name,))
+        setup = cursor.fetchone()
+
+        cursor.execute("SELECT * FROM devices WHERE iprange = ? ORDER BY sort", (setup.iprange,))
         devices = cursor.fetchall()
         conn.close()
         
