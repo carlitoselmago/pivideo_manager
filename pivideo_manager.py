@@ -297,6 +297,18 @@ class PiVideoManager:
         # Convert rows to dictionaries
         return [dict(device) for device in devices]
 
+    def get_all_devices_with_setup_name(self,name):
+        """Retrieve all devices from the database and return as a list of dictionaries."""
+        conn = sqlite3.connect(self.db_file)
+        conn.row_factory = sqlite3.Row  # Enables dictionary-like access
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM devices WHERE name = ? ORDER BY sort", (name,))
+        devices = cursor.fetchall()
+        conn.close()
+        
+        # Convert rows to dictionaries
+        return [dict(device) for device in devices]
  
     def get_ping_lag(self, target_ip):
         """Ping the master device to measure lag."""
@@ -577,7 +589,30 @@ class PiVideoManager:
 
         except Exception as e:
             print(f"Error showing message: {e}")
+    
+    def reboot_setup(setupname):
+        devices = self.get_all_devices_with_setup_name(setupname)
         
+        # Define a helper function for threading
+        def reboot_device(ip):
+            #self.playback_control(ip, command)
+            self.reboot_device(ip)
+
+        threads = []
+
+        # Create and start a thread for each device
+        for d in devices:
+            thread = threading.Thread(target=control_device, args=(d["ip"],))
+            thread.start()
+            threads.append(thread)
+
+        # Wait for all threads to complete
+        for thread in threads:
+            thread.join()
+
+        return True
+
+
     def reboot_device(self,ip):
         client = self.connect_to_device(ip)
         command = ('sudo reboot')
