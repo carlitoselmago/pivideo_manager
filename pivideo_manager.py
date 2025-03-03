@@ -590,7 +590,7 @@ class PiVideoManager:
         except Exception as e:
             print(f"Error showing message: {e}")
     
-    def reboot_setup(setupname):
+    def reboot_setup(self,setupname):
         devices = self.get_all_devices_with_setup_name(setupname)
         
         # Define a helper function for threading
