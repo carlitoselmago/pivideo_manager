@@ -7,5 +7,6 @@ except:
     print("No setupname argument detected")
     sys.exit()
 
+print("Rebooting setup with name: ",setupname)
 manager = PiVideoManager()
 manager.reboot_setup(setupname)
