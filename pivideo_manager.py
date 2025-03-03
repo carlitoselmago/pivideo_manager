@@ -308,7 +308,7 @@ class PiVideoManager:
         setup = cursor.fetchone()
         print("setup",dict(setup))
 
-        cursor.execute("SELECT * FROM devices WHERE iprange = ? ORDER BY sort", (setup.iprange,))
+        cursor.execute("SELECT * FROM devices WHERE iprange = ? ORDER BY sort", (setup["iprange"],))
         devices = cursor.fetchall()
         conn.close()
         
