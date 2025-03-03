@@ -602,6 +602,7 @@ class PiVideoManager:
 
         # Create and start a thread for each device
         for d in devices:
+            print("sending reboot signal to device IP",d["ip"])
             thread = threading.Thread(target=reboot_device, args=(d["ip"],))
             thread.start()
             threads.append(thread)
