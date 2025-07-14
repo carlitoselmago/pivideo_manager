@@ -29,6 +29,8 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'role' not in session:
+            # Store the full path (including query string)
+            session['next'] = request.full_path
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -85,19 +87,19 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        # Verify admin credentials
-        userrole = manager.check_login(username,password)
-        print("userrole",userrole)
+        userrole = manager.check_login(username, password)
         if userrole:
-            if userrole == "admin":
-                session['role'] = userrole
-                session["username"] = username
-                return redirect(url_for('home'))
-            if userrole !="":
-                session['role'] = userrole
-                session["username"] = username
-                return redirect(url_for('home_lite',friendlyurl=username))
+            session['role'] = userrole
+            session["username"] = username
             
+            # Handle redirect
+            next_url = session.pop('next', None)
+            if next_url:
+                return redirect(next_url)
+            elif userrole == "admin":
+                return redirect(url_for('home'))
+            else:
+                return redirect(url_for('home_lite', friendlyurl=username))
         else:
             return render_template('login.html', error="Invalid username or password")
     return render_template('login.html')
@@ -271,3 +273,4 @@ def update_device_order():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000,debug=True)
+
