@@ -694,17 +694,69 @@ class PiVideoManager:
                 client.close()
 
     ## Playback functions
-    def playback_control(self,ip,command="pause"):
-        if command=="pause":
-            run="sudo -E bash -c 'export DBUS_SESSION_BUS_ADDRESS=$(cat /tmp/omxplayerdbus.${USER:-root}) && dbus-send --print-reply=literal --session --dest=org.mpris.MediaPlayer2.omxplayer /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Action int32:16 >/dev/null'"
-        if command=="mute":
-            run = "sudo -E bash -c 'export DBUS_SESSION_BUS_ADDRESS=$(cat /tmp/omxplayerdbus.${USER:-root}) && dbus-send --print-reply=literal --session --dest=org.mpris.MediaPlayer2.omxplayer /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Set string:\"org.mpris.MediaPlayer2.Player\" string:\"Volume\" variant:double:0.0 >/dev/null'"
-        if command=="unmute":
-            run = "sudo -E bash -c 'export DBUS_SESSION_BUS_ADDRESS=$(cat /tmp/omxplayerdbus.${USER:-root}) && dbus-send --print-reply=literal --session --dest=org.mpris.MediaPlayer2.omxplayer /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Set string:\"org.mpris.MediaPlayer2.Player\" string:\"Volume\" variant:double:1.0 >/dev/null'"
-    
-        print("playback_control",ip,command)
-        self.execute_remote_command(ip,run,wait_for_output=True)
+    def playback_control(self, ip, command="pause"):
+        print("playback_control", ip, command)
+        
+        if command == "pause":
+            # Try omxplayer-sync first
+            omx_cmd = (
+                "sudo -E bash -c 'export DBUS_SESSION_BUS_ADDRESS=$(cat /tmp/omxplayerdbus.${USER:-root}) && "
+                "dbus-send --print-reply=literal --session --dest=org.mpris.MediaPlayer2.omxplayer "
+                "/org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Action int32:16 >/dev/null'"
+            )
+            self.execute_remote_command(ip, omx_cmd, wait_for_output=True)
+            
+            vlc_cmd = (
+                "VOLUME=$(sudo -u pi pactl get-sink-volume @DEFAULT_SINK@ | grep -o '[0-9]\\+%' | head -n1); "
+                "[ -n \"$VOLUME\" ] && echo \"$VOLUME\" > /home/pi/.last_volume; "
+                "sudo -u pi pactl set-sink-mute @DEFAULT_SINK@ 1"
+            )
+            self.execute_remote_command(ip, vlc_cmd, wait_for_output=True)
+
+        elif command == "mute":
+            # Try omxplayer-sync first
+            omx_cmd = (
+                "sudo -E bash -c 'export DBUS_SESSION_BUS_ADDRESS=$(cat /tmp/omxplayerdbus.${USER:-root}) && "
+                "dbus-send --print-reply=literal --session --dest=org.mpris.MediaPlayer2.omxplayer "
+                "/org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Set "
+                "string:\"org.mpris.MediaPlayer2.Player\" string:\"Volume\" variant:double:0.0 >/dev/null'"
+            )
+            self.execute_remote_command(ip, omx_cmd, wait_for_output=True)
+            
+            # Enhanced VLC/ALSA mute
+            vlc_cmd = (
+                "for card in $(aplay -l | grep '^card' | awk '{print $2}' | sed 's/://'); do "
+                "for ctl in $(amixer -c \"$card\" scontrols | awk -F\"'\" '{print $2}'); do "
+                "amixer -c \"$card\" sset \"$ctl\" mute || true; "
+                "done; done"
+            )
+            self.execute_remote_command(ip, vlc_cmd, wait_for_output=True)
+
+        elif command == "unmute":
+            # Try omxplayer-sync first
+            omx_cmd = (
+                "sudo -E bash -c 'export DBUS_SESSION_BUS_ADDRESS=$(cat /tmp/omxplayerdbus.${USER:-root}) && "
+                "dbus-send --print-reply=literal --session --dest=org.mpris.MediaPlayer2.omxplayer "
+                "/org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Set "
+                "string:\"org.mpris.MediaPlayer2.Player\" string:\"Volume\" variant:double:1.0 >/dev/null'"
+            )
+            self.execute_remote_command(ip, omx_cmd, wait_for_output=True)
+            
+            # Enhanced VLC/ALSA unmute
+            vlc_cmd = (
+               "for card in $(aplay -l | grep '^card' | awk '{print $2}' | sed 's/://'); do "
+                "for ctl in $(amixer -c \"$card\" scontrols | awk -F\"'\" '{print $2}'); do "
+                "amixer -c \"$card\" sset \"$ctl\" unmute || true; "
+                "done; done"
+            )
+            self.execute_remote_command(ip, vlc_cmd, wait_for_output=True)
+
+        else:
+            print(f"Unknown command: {command}")
+            return False
+
         return True
+
     
     def playbackall_control(self, iprange, command="pause"):
         # Get devices in iprange
