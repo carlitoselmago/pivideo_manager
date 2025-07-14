@@ -16,6 +16,12 @@ sudo python GUI.py
 
 and access via http://localhost:5000/pimanager
 
+You can access specific actions for setups via:
+/control/setupfriendlyname/
+
+and specific devices
+/control/setupfriendlyname/macadress
+
 
 To deploy as production:
 ```

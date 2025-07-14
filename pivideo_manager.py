@@ -381,7 +381,22 @@ class PiVideoManager:
         except ValueError:
             print("Invalid IP range format. Please use CIDR notation (e.g., 192.168.1.0/24).")
 
-
+    def delete_setup(self, ip_range):
+        """Deletes the setup and all devices that have the same iprange"""
+        
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+        # Delete devices with the given iprange
+        cursor.execute('DELETE FROM devices WHERE iprange = ?', (ip_range,))
+        # Delete setup with the given iprange
+        cursor.execute('DELETE FROM setup WHERE iprange = ?', (ip_range,))
+        # Optionally, delete users associated with this setup
+        cursor.execute('DELETE FROM users WHERE setup = ?', (ip_range,))
+        conn.commit()
+        conn.close()
+        
+        print("DELETED setup with iprange",ip_range)
+        
     def handle_missing_devices(self,devices):
         """It gets a list of mac adresses to flag as missing in the db"""
         conn = sqlite3.connect(self.db_file)

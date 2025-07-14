@@ -69,6 +69,15 @@ def home_lite(friendlyurl):
     return render_template('setuplite.html', setup=setup,homeurl=homeurl)
 
 
+@app.route(homeurl+'/control/<friendlyurl>/<mac>')
+@login_required
+def home_lite_device(friendlyurl,mac):
+    setup = manager.get_setup_by_friendlyurl(friendlyurl)
+    print(setup)
+    device = manager.get_device_by_mac(mac)
+    print(mac)
+    return render_template('setuplitedevice.html', setup=setup,device=device,homeurl=homeurl)
+
 @app.route(homeurl+'/login', methods=['GET', 'POST'])
 def login():
     """Admin login page."""
@@ -149,6 +158,15 @@ def scan_network():
     
     manager.scan_ip_range(ip_range)
     return jsonify({"message": "Scan completed."})
+
+@app.route(homeurl+'/api/delete_setup', methods=['POST'])
+@login_required
+def delete_setup():
+    """API endpoint to trigger IP scan."""
+    ip_range = request.json.get('ip_range')
+    
+    manager.delete_setup(ip_range)
+    return jsonify({"message": "setup deleted."})
 
 @app.route(homeurl+'/api/update_device', methods=['POST'])
 @login_required

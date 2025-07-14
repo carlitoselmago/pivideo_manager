@@ -94,6 +94,30 @@ $(document).ready(function () {
         });
     });
 
+    // Handle delete setup
+     $("body").on("click",'.delete-btn',function () {
+        if (!confirm("Are you sure you want to delete this setup? This action cannot be undone.")) {
+            return;
+        }
+        var setupElement = $(this).closest(".setup");
+        setupElement.addClass("updating");
+        var iprange = setupElement.attr("iprange"); 
+        
+        $.ajax({
+            url: homeurl+'/api/delete_setup',
+            type: 'POST',
+            contentType: 'application/json',
+            data:JSON.stringify({ ip_range: iprange }),
+            success: function (response) {
+                    console.log("Finished deleting setup.");
+                    location.reload();
+            },
+            error: function (xhr) {
+                alert("Error deleting setup: " + xhr.responseText);
+            }
+        });
+    });
+
     $("body").on("click",'.playback-btn',function () {
         var buttonelement = $(this);
         var deviceElement = $(this).closest(".device");
@@ -255,3 +279,4 @@ $(document).ready(function () {
     });
 
 });
+
